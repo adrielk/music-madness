@@ -17,7 +17,7 @@ Created on Fri Jan  3 16:25:41 2020
         bias of previously played songs (bias<1) are increment by 0.1(or whatever value)
     
 """
-#Add a back button...!
+#Add a back button...! (DONE)
 #Database: allow users to create their own playlists in desired order (using SQLite or something?)
 #use regex to neaten up titles...
 #automated classification of songs
@@ -50,6 +50,8 @@ isPaused = False
 isLooped = False
 isShuffled = False
 isOrdered = False
+songsHistory = []
+songsForward = []
 #for bias randomization
 biasInc = 0.05
 #customization
@@ -71,6 +73,26 @@ def CheckSongEndedThread(name):
                     SongEnded()
         else:
             break
+
+def SongEnded():
+    #history for purposes of back functionality
+    if not playList.get(tkr.ACTIVE) in songsHistory:
+        songsHistory.append(playList.get(tkr.ACTIVE))
+        
+    if isLooped == True:
+        Play()
+        print("Looped")
+    elif isShuffled == True:
+        print("Shuffled")
+        PickRandomSong()
+        Play()
+    elif isOrdered == True:
+        PickNextSong()
+        Play()
+        print("Ordered")
+    else:
+        print("DONE")
+    print("SONG ENDED")
         
 def ResetToggleControls(beingToggled):
     global isLooped, isShuffled, isOrdered
@@ -144,6 +166,7 @@ def Play():
     pygame.mixer.music.set_endevent(SONG_END)
     pygame.mixer.music.load(queuedSong)
     pygame.mixer.music.play()
+    print(queuedSong)
     
 #incrementing bias increases chances for a song being chosen
 def IncrementBias():
@@ -176,25 +199,37 @@ def PickRandomSong():
 #    print(totalBias)
     playList.activate(randSongIndex)
    # playList.activate(random.randint(0,len(songList)))
+   
+def PlayForwardSong():
+    #if no more forward, then it just stops song to trigger next song
+    if len(songsForward)>0:
+        forSong = songsForward.pop()
+        
+        songsHistory.append(playList.get(tkr.ACTIVE))
+        
+        playList.activate(songList.index(forSong))
+        Play()
+    else:
+        ExitPlayer()
+    print("From Forward Song FUNCTION: Song forward stack: ",songsForward)
+    print("Song history:", songsHistory)
+        
+        
+def PlayPreviousSong():
+    if len(songsHistory)>0:
+        prevSong = songsHistory.pop()
+        
+        songsForward.append(playList.get(tkr.ACTIVE))
+        
+        playList.activate(songList.index(prevSong))
+        Play()
+    print("From Previous Song FUNCTION: Song history:", songsHistory)
+    print("Song forward stack: ",songsForward)
+
+    
 
 def PickNextSong():
     playList.activate((songList.index(playList.get(tkr.ACTIVE))+1)%len(songList))
-
-def SongEnded():
-    if isLooped == True:
-        Play()
-        print("Looped")
-    elif isShuffled == True:
-        print("Shuffled")
-        PickRandomSong()
-        Play()
-    elif isOrdered == True:
-        PickNextSong()
-        Play()
-        print("Ordered")
-    else:
-        print("DONE")
-    print("SONG ENDED")
 
 def ExitPlayer():
     pygame.mixer.music.stop()    
@@ -237,10 +272,11 @@ pauseB = tkr.Button(stopControlFrame,height = 1 ,textvariable = pauseTxt, comman
 """Frame for loop, shuffle, or sequential control options"""
 controlFrame = tkr.Frame(player)
 
-
+backB = tkr.Button(controlFrame,height =1, text = "Back",command = PlayPreviousSong ,font = ("Helvetica",15),background = accentColor, fg = primaryColor)
 loopB = tkr.Button(controlFrame,height = 1,textvariable = loopVar, command = ToggleLooped,font = ("Helvetica",15),background = primaryColor)
 shuffleB = tkr.Button(controlFrame,height = 1,textvariable = shuffledTxt, command = ToggleShuffled,font = ("Helvetica",15),background = primaryColor)
 seqB = tkr.Button(controlFrame, height = 1,textvariable = orderTxt, command = ToggleOrdered,font = ("Helvetica",15),background = primaryColor)
+forB = tkr.Button(controlFrame,height =1, text = "Forward",command = PlayForwardSong ,font = ("Helvetica",15),background = accentColor, fg = primaryColor)
 
 """Volume control"""
 volScale = tkr.Scale(player,from_ = 0, to_= 100,
@@ -267,9 +303,11 @@ stopB.pack(side ="left", fill = "both",expand = "YES")
 controlFrame.pack(fill = "x")
 
 #control butotns
+backB.pack(side = "left", fill = "both", expand = "YES")
 loopB.pack(side ="left", fill = "both",expand = "YES")
 shuffleB.pack(side = "left", fill = "both", expand = "YES")
 seqB.pack(side = "left", fill = "both", expand = "YES")
+forB.pack(side = "left", fill = "both", expand = "YES")
 volScale.pack(fill = "x")
 playList.pack(fill = "x")
 
