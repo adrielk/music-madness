@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-MP3 Player
+MP3 Player V 1.2.0
 Created on Fri Jan  3 16:25:41 2020
 
 @author: thead
 """
 """to Do"""
-#biased randomization(DONE,but room for improvement)
+#biased randomization(DONE,but might want to preserve total bias)
 """
     Algo:
         all start iwth bias of 1
@@ -19,7 +19,7 @@ Created on Fri Jan  3 16:25:41 2020
 """
 #Add a back button...! (DONE)
 #Database: allow users to create their own playlists in desired order (using SQLite or something?)
-#use regex to neaten up titles...
+#use regex to neaten up titles...(DONE! But room for improvement)
 #automated classification of songs
 #liked songs + ML!
 #automated removal of non-music parts of video
@@ -33,25 +33,25 @@ import threading
 import os #allows us to read and print out stuff in a folder
 import random
 import time
+import re
 
 """Playlist Register"""
-#chdir = change directory
-os.chdir(r"C:\Users\thead\Desktop\MusicPlayer\Songs")#changes your current directory!
+os.chdir(r"C:\Users\thead\Desktop\MusicPlayer\Songs")
 songList = os.listdir()
-songListDict = {i:1 for i in songList}
-#print(os.getcwd()) this is file path
+songListDict = {i:1 for i in songList}#print(os.getcwd()) this is file path
+songsHistory = []
+songsForward = []
 
 """Pygame Inits"""
 pygame.init()
 pygame.mixer.init()
+
 """Variables"""
 threadAlive = True
 isPaused = False
 isLooped = False
 isShuffled = False
 isOrdered = False
-songsHistory = []
-songsForward = []
 #for bias randomization
 biasInc = 0.05
 #customization
@@ -64,7 +64,6 @@ startTime = time.time()
 SONG_END = pygame.USEREVENT+1
 
 #Action events and functions
-
 def CheckSongEndedThread(name):
     while True:
         if threadAlive:
@@ -73,6 +72,21 @@ def CheckSongEndedThread(name):
                     SongEnded()
         else:
             break
+        
+def ProcessTitle(songStr):
+    name = ""
+    songTitleRaw = songStr[0:songStr.index(".mp3")]
+    patternExtract = re.compile(r'.+ ((-.+\-)|\[|\()')#r'(\(|\[).+')
+    matches = patternExtract.finditer(songTitleRaw)
+    
+    for match in matches:
+        name += match.group(0)
+        
+    if(len(name) ==0):
+        name = songTitleRaw
+    name = name.replace(name[len(name)-1],"").strip()
+    
+    return name
 
 def SongEnded():
     #history for purposes of back functionality
@@ -81,18 +95,14 @@ def SongEnded():
         
     if isLooped == True:
         Play()
-        print("Looped")
     elif isShuffled == True:
-        print("Shuffled")
         PickRandomSong()
         Play()
     elif isOrdered == True:
         PickNextSong()
         Play()
-        print("Ordered")
     else:
         print("DONE")
-    print("SONG ENDED")
         
 def ResetToggleControls(beingToggled):
     global isLooped, isShuffled, isOrdered
@@ -144,7 +154,7 @@ def UpdateVolume(vol):
     pygame.mixer.music.set_volume(convertedVol)
 
 def UpdateTitle():
-    var.set(playList.get(tkr.ACTIVE)[0:playList.get(tkr.ACTIVE).index(".mp3")])
+    var.set(playList.get(tkr.ACTIVE))
 
 def Pause():
     global isPaused
@@ -158,7 +168,8 @@ def Pause():
         pygame.mixer.music.unpause()  
         
 def Play():
-    queuedSong = playList.get(tkr.ACTIVE)
+
+    queuedSong =songList[playList.index(tkr.ACTIVE)]# playList.get(tkr.ACTIVE)
     if not queuedSong in songsPlayed:
         songsPlayed.append(queuedSong)
     
@@ -180,56 +191,47 @@ def PickRandomSong():
     itemSum = 0
     randSongIndex = 0
     totalBias = 0
+    randSongNum = random.uniform(0,len(songList))
+    currentSong = songList[playList.index(tkr.ACTIVE)]
+    songListDict[currentSong] = 0
     
     IncrementBias()#This increments bias of songs in songListDict. Thus, allowing songs with <1 bias to recover their chance of being chosen
-    currentSong = playList.get(tkr.ACTIVE)
-    songListDict[currentSong] = 0
+
     for i in songListDict.values():
         totalBias+=i
-    
-    randSongNum = random.uniform(0,len(songList))
-    
+
     for i in songListDict.values():
         itemSum+=i
         if itemSum > randSongNum:
             break
         randSongIndex +=1
-#    print(itemSum)
-    print(randSongIndex)
-#    print(totalBias)
+    
     playList.activate(randSongIndex)
-   # playList.activate(random.randint(0,len(songList)))
    
 def PlayForwardSong():
-    #if no more forward, then it just stops song to trigger next song
     if len(songsForward)>0:
         forSong = songsForward.pop()
-        
         songsHistory.append(playList.get(tkr.ACTIVE))
-        
-        playList.activate(songList.index(forSong))
+        forSongIndex = playList.get(0,"end").index(forSong)
+        playList.activate(forSongIndex)     
         Play()
     else:
         ExitPlayer()
-    print("From Forward Song FUNCTION: Song forward stack: ",songsForward)
-    print("Song history:", songsHistory)
-        
+#    print("From Forward Song FUNCTION: Song forward stack: ",songsForward)
+#    print("Song history:", songsHistory)
         
 def PlayPreviousSong():
     if len(songsHistory)>0:
         prevSong = songsHistory.pop()
-        
         songsForward.append(playList.get(tkr.ACTIVE))
-        
-        playList.activate(songList.index(prevSong))
+        prevSongIndex = playList.get(0, "end").index(prevSong)#converts playList into a list to find index of previous song
+        playList.activate(prevSongIndex)
         Play()
-    print("From Previous Song FUNCTION: Song history:", songsHistory)
-    print("Song forward stack: ",songsForward)
-
-    
+#    print("From Previous Song FUNCTION: Song history:", songsHistory)
+#    print("Song forward stack: ",songsForward)
 
 def PickNextSong():
-    playList.activate((songList.index(playList.get(tkr.ACTIVE))+1)%len(songList))
+    playList.activate((playList.index(tkr.ACTIVE)+1)%len(songList))
 
 def ExitPlayer():
     pygame.mixer.music.stop()    
@@ -237,15 +239,12 @@ def ExitPlayer():
 def OnExit():#stops all processes when window is closed
     global threadAlive
     global startTime
-    timeElapsed = time.time()-startTime
-    
-    print("Length: %d" %(len(songsPlayed)),"; Songs Played: ",songsPlayed)
-    print("Listening time: %.2f seconds or %.2f minutes" %(timeElapsed, timeElapsed/60))
-    
+    timeElapsed = time.time()-startTime    
     ExitPlayer()
     player.destroy()
     threadAlive = False
-            
+    print("Length: %d" %(len(songsPlayed)),"; Songs Played: ",songsPlayed)
+    print("Listening time: %.2f seconds or %.2f minutes" %(timeElapsed, timeElapsed/60))            
             
 """Basic set up"""
 player = tkr.Tk()
@@ -264,35 +263,45 @@ shuffledTxt.set("Shuffle")
 orderTxt = tkr.StringVar()
 orderTxt.set("Order")
 
-
 stopControlFrame = tkr.Frame(player,width=5,height = 2)
-playB = tkr.Button(player,width=5,height = 2, text = "Play", command = Play,activebackground = "SpringGreen3",font = ("Helvetica",15),background = primaryColor)
-stopB = tkr.Button(stopControlFrame,height = 1 ,text = "Stop", command = ExitPlayer, activebackground = "red",font = ("Helvetica",15),background = primaryColor)
-pauseB = tkr.Button(stopControlFrame,height = 1 ,textvariable = pauseTxt, command = Pause,font = ("Helvetica",15),background = primaryColor)
+playB = tkr.Button(player,width=5,height = 1, text = "Play", 
+                   command = Play,activebackground = "SpringGreen3",font = ("Helvetica",15),background = primaryColor)
+stopB = tkr.Button(stopControlFrame,height = 1 ,text = "Stop", 
+                   command = ExitPlayer, activebackground = "red",font = ("Helvetica",15),background = primaryColor)
+pauseB = tkr.Button(stopControlFrame,height = 1 ,textvariable = pauseTxt, 
+                    command = Pause,font = ("Helvetica",15),background = primaryColor)
 """Frame for loop, shuffle, or sequential control options"""
 controlFrame = tkr.Frame(player)
 
-backB = tkr.Button(controlFrame,height =1, text = "Back",command = PlayPreviousSong ,font = ("Helvetica",15),background = accentColor, fg = primaryColor)
-loopB = tkr.Button(controlFrame,height = 1,textvariable = loopVar, command = ToggleLooped,font = ("Helvetica",15),background = primaryColor)
-shuffleB = tkr.Button(controlFrame,height = 1,textvariable = shuffledTxt, command = ToggleShuffled,font = ("Helvetica",15),background = primaryColor)
-seqB = tkr.Button(controlFrame, height = 1,textvariable = orderTxt, command = ToggleOrdered,font = ("Helvetica",15),background = primaryColor)
-forB = tkr.Button(controlFrame,height =1, text = "Forward",command = PlayForwardSong ,font = ("Helvetica",15),background = accentColor, fg = primaryColor)
+backB = tkr.Button(controlFrame,height =1, text = "Back",
+                   command = PlayPreviousSong ,font = ("Helvetica",15),background = accentColor, fg = primaryColor)
+loopB = tkr.Button(controlFrame,height = 1,textvariable = loopVar, 
+                   command = ToggleLooped,font = ("Helvetica",15),background = primaryColor)
+shuffleB = tkr.Button(controlFrame,height = 1,textvariable = shuffledTxt, 
+                      command = ToggleShuffled,font = ("Helvetica",15),background = primaryColor)
+seqB = tkr.Button(controlFrame, height = 1,textvariable = orderTxt, 
+                  command = ToggleOrdered,font = ("Helvetica",15),background = primaryColor)
+forB = tkr.Button(controlFrame,height =1, text = "Forward",
+                  command = PlayForwardSong ,font = ("Helvetica",15),background = accentColor, fg = primaryColor)
 
 """Volume control"""
-volScale = tkr.Scale(player,from_ = 0, to_= 100,
-                     orient = tkr.HORIZONTAL,resolution = 1, command = UpdateVolume,troughcolor = primaryColor, background = accentColor, fg = "white")
+volScale = tkr.Scale(player,from_ = 0, to_= 100, orient = tkr.HORIZONTAL,resolution = 1, 
+                     command = UpdateVolume,troughcolor = primaryColor, background = accentColor, fg = "white")
 volScale.set(50)
 UpdateVolume(volScale.get())
 
 """PlayList"""
-playList = tkr.Listbox(player, highlightcolor = "blue",selectmode = tkr.SINGLE,font = ("Helvetica",11),background = accentColor,fg = "white")#restricts to only ONE selections
+playList = tkr.Listbox(player, highlightcolor = "blue",selectmode = tkr.SINGLE,font = ("Helvetica",11),
+                       background = accentColor,fg = "white")#restricts to only ONE selections
+
 for pos in range(0,len(songList)):
-    playList.insert(pos,songList[pos])
+    playList.insert(pos,ProcessTitle(songList[pos]))
     
 """Title"""
 #by using text variable, can be changed without recreating title!
 var = tkr.StringVar()
-songtitle = tkr.Label(player, height = 1, textvariable= var,font = ("Helvetica",20),background = accentColor, fg= "white")
+songtitle = tkr.Label(player, height = 1, textvariable= var,
+                      font = ("Helvetica",18),background = accentColor, fg= "white")
 
 #place widgets: order matters!
 songtitle.pack(fill = "x")
@@ -320,36 +329,3 @@ eventThread.start()
 player.protocol("WM_DELETE_WINDOW", OnExit)
 player.mainloop()
 player.attributes("-topmost", True)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
