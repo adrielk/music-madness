@@ -11,8 +11,9 @@ store mp3 files that you want to play using the music player.
 - Basic controls: Play, pause, stop, volume scroll
 - Music sequence controls: Loop, Shuffle, Order
 
-## Version 1.1.0 of music player:
+## Version 1.2.0 of music player:
 - Forward and backward controls
+- Song title processing for pleasant user experience
 
 ---
 ## Youtube Video to MP3 Downloader using youtube-dl:
